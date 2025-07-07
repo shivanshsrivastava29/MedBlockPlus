@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Scan QR</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+  <div class="bg-gray-800 p-6 rounded-lg shadow w-full max-w-md text-center">
+    <h2 class="text-xl font-bold mb-4">📸 Scan QR Code</h2>
+    <div id="reader" class="w-full"></div>
+    <a href="index.html" class="block mt-4 text-sm text-blue-500 underline">← Back to Upload</a>
+  </div>
+
+  <script>
+    function onScanSuccess(decodedText) {
+      if (decodedText.startsWith("http")) {
+        window.location.href = decodedText;
+      } else {
+        alert("Invalid QR Code");
+      }
+    }
+
+    const html5QrCode = new Html5Qrcode("reader");
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length) {
+        html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: 250 },
+          onScanSuccess
+        );
+      }
+    });
+  </script>
+</body>
+</html>

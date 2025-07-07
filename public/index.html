@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Secure Upload & Verify</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', sans-serif;
+        background: radial-gradient(circle at top left, #1e3a8a, #f97316);
+        background: linear-gradient(120deg, #0f0c29, #302b63, #24243e);
+        overflow-x: hidden;
+        color: white;
+      }
+      .glass-box {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(24px);
+        box-shadow: 0 0 40px rgba(255, 255, 255, 0.15);
+        border-radius: 1rem;
+        padding: 2rem;
+        width: 100%;
+        max-width: 450px;
+        z-index: 10;
+      }
+      canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="particles"></canvas>
+
+    <div class="min-h-screen flex items-center justify-center px-4">
+      <div class="glass-box text-center">
+        <h2 class="text-3xl font-bold text-white flex items-center justify-center mb-2">
+          <span class="text-yellow-400 text-4xl mr-2">🔐</span> Secure Upload & Verify
+        </h2>
+        <p class="text-sm text-gray-300 mb-6">
+          Upload files, secure them with cryptographic hashes,<br />
+          and verify their integrity with confidence.
+        </p>
+
+        <div id="logoutBtn" class="text-right text-red-400 text-sm cursor-pointer mb-4 hidden">Logout</div>
+
+        <!-- AUTH SECTION -->
+        <div id="auth-section">
+          <input id="email" type="email" placeholder="Email" class="w-full p-2 mb-2 rounded bg-slate-800 placeholder-gray-300" />
+          <input id="password" type="password" placeholder="Password" class="w-full p-2 mb-2 rounded bg-slate-800 placeholder-gray-300" />
+
+          <button id="loginBtn" class="w-full p-2 rounded mb-2 bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold">
+            🔐 Log In
+          </button>
+          <button id="signupBtn" class="w-full p-2 rounded mb-4 bg-slate-700 text-white font-medium">
+            📝 Sign Up
+          </button>
+
+          <div class="flex justify-center mb-4 gap-4">
+            <button onclick="googleLogin()" class="bg-white p-2 rounded-full">
+              <img src="https://cdn-icons-png.flaticon.com/512/2991/2991148.png" class="w-6 h-6" alt="Google" />
+            </button>
+            <button onclick="githubLogin()" class="bg-white p-2 rounded-full">
+              <img src="https://cdn-icons-png.flaticon.com/512/733/733609.png" class="w-6 h-6" alt="GitHub" />
+            </button>
+          </div>
+
+          <div class="mt-6 space-y-2 text-sm text-left bg-black bg-opacity-10 p-4 rounded-lg border border-white border-opacity-10">
+            <div class="flex items-center gap-2">
+              <span class="text-purple-400 text-xl">⬆</span>
+              <span class="text-white">Upload File</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-blue-400 text-xl">✔</span>
+              <span class="text-white">Verify Integrity</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-green-400 text-xl">🛡</span>
+              <span class="text-white">Cryptographic Security</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- UPLOAD SECTION -->
+        <div id="upload-section" class="hidden text-left text-sm">
+          <input type="file" id="fileInput" class="w-full p-2 mb-2 rounded bg-slate-800" />
+          <progress id="uploadProgress" value="0" max="100" class="w-full mb-2"></progress>
+          <button id="uploadBtn" class="bg-green-600 hover:bg-green-700 text-white w-full p-2 rounded mb-4">🚀 Upload & Secure</button>
+
+          <div id="hashOutput" class="text-xs text-pink-300 mb-4 break-all"></div>
+
+          <p class="text-sm text-gray-300">Re-upload file to verify integrity:</p>
+          <input type="file" id="verifyInput" class="w-full p-2 mb-2 rounded bg-slate-800" />
+          <button id="verifyBtn" class="bg-blue-600 hover:bg-blue-700 text-white w-full p-2 rounded mb-2">🔍 Verify File</button>
+          <div id="verifyResult" class="text-sm mt-2 text-center"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyAp3nc5G8ruFVlwGgyBdjIXqFSQeo2Wi8I",
+        authDomain: "medblockplus.firebaseapp.com",
+        projectId: "medblockplus"
+      };
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+
+      const emailEl = document.getElementById("email");
+      const passwordEl = document.getElementById("password");
+      const loginBtn = document.getElementById("loginBtn");
+      const signupBtn = document.getElementById("signupBtn");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const authSection = document.getElementById("auth-section");
+      const uploadSection = document.getElementById("upload-section");
+
+      loginBtn.onclick = () => {
+        auth.signInWithEmailAndPassword(emailEl.value, passwordEl.value).catch(alert);
+      };
+      signupBtn.onclick = () => {
+        auth.createUserWithEmailAndPassword(emailEl.value, passwordEl.value).catch(alert);
+      };
+      logoutBtn.onclick = () => {
+        auth.signOut();
+      };
+      function googleLogin() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(alert);
+      }
+      function githubLogin() {
+        const provider = new firebase.auth.GithubAuthProvider();
+        auth.signInWithPopup(provider).catch(alert);
+      }
+
+      auth.onAuthStateChanged(user => {
+        if (user) {
+          authSection.classList.add("hidden");
+          uploadSection.classList.remove("hidden");
+          logoutBtn.classList.remove("hidden");
+        } else {
+          authSection.classList.remove("hidden");
+          uploadSection.classList.add("hidden");
+          logoutBtn.classList.add("hidden");
+        }
+      });
+
+      // Upload + Verify logic
+      const uploadBtn = document.getElementById("uploadBtn");
+      const fileInput = document.getElementById("fileInput");
+      const uploadProgress = document.getElementById("uploadProgress");
+      const hashOutput = document.getElementById("hashOutput");
+      const verifyInput = document.getElementById("verifyInput");
+      const verifyBtn = document.getElementById("verifyBtn");
+      const verifyResult = document.getElementById("verifyResult");
+      let uploadedHash = null;
+
+      uploadBtn.onclick = () => {
+        const file = fileInput.files[0];
+        if (!file) return alert("Please choose a file");
+        uploadProgress.value = 0;
+        let progress = 0;
+        const interval = setInterval(() => {
+          progress += 10;
+          uploadProgress.value = progress;
+          if (progress >= 100) {
+            clearInterval(interval);
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              const wordArray = CryptoJS.lib.WordArray.create(e.target.result);
+              uploadedHash = CryptoJS.SHA256(wordArray).toString();
+              hashOutput.innerText = `SHA-256: ${uploadedHash}`;
+            };
+            reader.readAsArrayBuffer(file);
+          }
+        }, 100);
+      };
+
+      verifyBtn.onclick = () => {
+        const file = verifyInput.files[0];
+        if (!file || !uploadedHash) return alert("Select a file to verify and upload first.");
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const wordArray = CryptoJS.lib.WordArray.create(e.target.result);
+          const verifyHash = CryptoJS.SHA256(wordArray).toString();
+          if (verifyHash === uploadedHash) {
+            verifyResult.innerHTML = "<span class='text-green-400'>✅ File verified: hash matches!</span>";
+          } else {
+            verifyResult.innerHTML = "<span class='text-red-400'>❌ Tampered: hash mismatch.</span>";
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      };
+    </script>
+
+    <!-- Particles Background -->
+    <script>
+      const canvas = document.getElementById("particles");
+      const ctx = canvas.getContext("2d");
+      let w = canvas.width = window.innerWidth;
+      let h = canvas.height = window.innerHeight;
+
+      const particles = Array.from({ length: 100 }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: Math.random() * 2 + 1,
+        dx: Math.random() - 0.5,
+        dy: Math.random() - 0.5,
+        color: `hsl(${Math.random() * 360}, 100%, 70%)`
+      }));
+
+      function animate() {
+        ctx.clearRect(0, 0, w, h);
+        for (let p of particles) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.fill();
+          p.x += p.dx;
+          p.y += p.dy;
+          if (p.x < 0 || p.x > w) p.dx *= -1;
+          if (p.y < 0 || p.y > h) p.dy *= -1;
+        }
+        requestAnimationFrame(animate);
+      }
+
+      window.onresize = () => {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+      };
+      animate();
+    </script>
+  </body>
+</html>
